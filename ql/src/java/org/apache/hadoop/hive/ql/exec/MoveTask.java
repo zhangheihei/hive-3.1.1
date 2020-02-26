@@ -252,8 +252,11 @@ public class MoveTask extends Task<MoveWork> implements Serializable {
   // we check if there is only one immediate child task and it is stats task
   public boolean hasFollowingStatsTask() {
     if (this.getNumChild() == 1) {
+      LOG.info("edwin movetask after loadPartition 1" + (this.getChildTasks().get(0) instanceof StatsTask));
       return this.getChildTasks().get(0) instanceof StatsTask;
     }
+    LOG.info("edwin movetask after loadPartition false");
+
     return false;
   }
 
@@ -477,6 +480,7 @@ public class MoveTask extends Task<MoveWork> implements Serializable {
          hasFollowingStatsTask(),
         tbd.getWriteId(), tbd.getStmtId(), tbd.isInsertOverwrite());
     Partition partn = db.getPartition(table, tbd.getPartitionSpec(), false);
+    LOG.info("edwin movetask after loadPartition ****");
 
     // See the comment inside updatePartitionBucketSortColumns.
     if (!tbd.isMmTable() && (ti.bucketCols != null || ti.sortCols != null)) {
