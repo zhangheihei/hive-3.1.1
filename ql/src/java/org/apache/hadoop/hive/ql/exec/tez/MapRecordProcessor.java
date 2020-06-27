@@ -127,7 +127,7 @@ public class MapRecordProcessor extends RecordProcessor {
     String key = processorContext.getTaskVertexName() + MAP_PLAN_KEY;
     cacheKeys.add(key);
 
-
+    l4j.info("LLAP cache is {}", cache.getClass().getName());
     // create map and fetch operators
     mapWork = (MapWork) cache.retrieve(key, new Callable<Object>() {
         @Override
@@ -140,6 +140,7 @@ public class MapRecordProcessor extends RecordProcessor {
 
     String prefixes = jconf.get(DagUtils.TEZ_MERGE_WORK_FILE_PREFIXES);
     if (prefixes != null) {
+      l4j.info("LLAP MapRecord init prefixes={}", prefixes);
       mergeWorkList = new ArrayList<MapWork>();
 
       for (final String prefix : prefixes.split(",")) {
@@ -161,6 +162,7 @@ public class MapRecordProcessor extends RecordProcessor {
                 }));
       }
     }
+
 
     MapredContext.init(true, new JobConf(jconf));
     ((TezContext) MapredContext.get()).setInputs(inputs);
@@ -196,6 +198,8 @@ public class MapRecordProcessor extends RecordProcessor {
       } else {
         mapOp = new MapOperator(runtimeCtx);
       }
+
+      l4j.debug("hive.vectorized.execution.enabled mapOp is {}", mapOp.getClass().getName());
 
       // Not synchronizing creation of mapOp with an invocation. Check immediately
       // after creation in case abort has been set.
@@ -286,6 +290,9 @@ public class MapRecordProcessor extends RecordProcessor {
       mapOp.setChildren(jconf);
       mapOp.passExecContext(execContext);
       l4j.info(mapOp.dump(0));
+      l4j.info("MapRecord operator child size={}, dump = {}, class={}", mapOp.getChildOperators().size(),
+            mapOp.getChildOperators().get(0).dump(0), mapOp.getChildOperators().get(0).getClass().getName());
+
 
       // set memory available for operators
       long memoryAvailableToTask = processorContext.getTotalMemoryAvailableToTask();
@@ -295,12 +302,15 @@ public class MapRecordProcessor extends RecordProcessor {
       }
       OperatorUtils.setMemoryAvailable(mapOp.getChildOperators(), memoryAvailableToTask);
 
+      //nothing to do, nima
       mapOp.initializeLocalWork(jconf);
 
       // Setup values registry
       checkAbortCondition();
       String valueRegistryKey = DynamicValue.DYNAMIC_VALUE_REGISTRY_CACHE_KEY;
-      // On LLAP dynamic value registry might already be cached.
+      l4j.info("LLAP dynamicValueCache is {}", dynamicValueCache.getClass().getName());
+
+        // On LLAP dynamic value registry might already be cached.
       final DynamicValueRegistryTez registryTez = dynamicValueCache.retrieve(valueRegistryKey,
           new Callable<DynamicValueRegistryTez>() {
             @Override
@@ -329,6 +339,7 @@ public class MapRecordProcessor extends RecordProcessor {
       List<HashTableDummyOperator> dummyOps = mapWork.getDummyOps();
       jconf.set(Utilities.INPUT_NAME, mapWork.getName());
       if (dummyOps != null) {
+        l4j.info("LLAP MapRecordProcessor dummyOps is not null");
         for (Operator<? extends OperatorDesc> dummyOp : dummyOps){
           dummyOp.setExecContext(execContext);
           // TODO HIVE-14042. Handling of dummyOps, and propagating abort information to them
@@ -370,6 +381,8 @@ public class MapRecordProcessor extends RecordProcessor {
       reader = legacyMRInput.getReader();
     }
     sources[position].init(jconf, mapOp, reader);
+    l4j.debug("MapRecord processor size={}, position={}, mainWorkMultiMRInput null = {}, reade class = {}", size,
+            position, mainWorkMultiMRInput != null?false:true, reader.getClass().getName());
     for (AbstractMapOperator mapOp : mergeMapOpList) {
       int tag = mapOp.getConf().getTag();
       sources[tag] = new MapRecordSource();
@@ -522,8 +535,11 @@ public class MapRecordProcessor extends RecordProcessor {
       }
     }
     if (theMRInput != null) {
+      l4j.info("edwin MapRecordProcessor call input init, class = {}", theMRInput.getClass().getName());
       theMRInput.init();
     } else {
+      l4j.info("edwin MapRecordProcessor gen mainWorkMultiMRInput");
+
       String alias = mapWork.getAliasToWork().keySet().iterator().next();
       if (inputs.get(alias) instanceof MultiMRInput) {
         mainWorkMultiMRInput = (MultiMRInput) inputs.get(alias);

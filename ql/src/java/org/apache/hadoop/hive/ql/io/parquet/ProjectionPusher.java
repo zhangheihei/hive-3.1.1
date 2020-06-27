@@ -66,6 +66,7 @@ public class ProjectionPusher {
     if (mapWork == null && plan != null && plan.length() > 0) {
       mapWork = Utilities.getMapWork(job);
       pathToPartitionInfo.clear();
+      LOG.debug("LLAP project push paths = {}", mapWork.getPathToPartitionInfo().keySet());
       for (final Map.Entry<Path, PartitionDesc> entry : mapWork.getPathToPartitionInfo().entrySet()) {
         // key contains scheme (such as pfile://) and we want only the path portion fix in HIVE-6366
         pathToPartitionInfo.put(Path.getPathWithoutSchemeAndAuthority(entry.getKey()), entry.getValue());
@@ -90,6 +91,8 @@ public class ProjectionPusher {
       if (a != null) {
         aliases.addAll(a);
       }
+
+      LOG.debug("parquet push down mapwork alias={}, alias={}", mapWork.getPathToAliases().toString(), aliases.toString());
       if (a == null || a.isEmpty()) {
         // TODO: not having aliases for path usually means some bug. Should it give up?
         LOG.warn("Couldn't find aliases for " + splitPath);
@@ -111,6 +114,7 @@ public class ProjectionPusher {
     for(String alias : aliases) {
       final Operator<? extends Serializable> op =
           mapWork.getAliasToWork().get(alias);
+      LOG.debug("parquet push down operator = {}", op.dump(0));
       if (op != null && op instanceof TableScanOperator) {
         final TableScanOperator ts = (TableScanOperator) op;
 
@@ -122,7 +126,8 @@ public class ProjectionPusher {
             neededNestedColumnPaths.addAll(ts.getNeededNestedColumnPaths());
           }
         }
-
+        LOG.debug("parquet push down operator neededColumnIDs={}, neededNestedColumnPaths={}",
+                neededColumnIDs.toString(), neededNestedColumnPaths.toString());
         rowSchema = ts.getSchema();
         ExprNodeGenericFuncDesc filterExpr =
             ts.getConf() == null ? null : ts.getConf().getFilterExpr();
@@ -151,9 +156,17 @@ public class ProjectionPusher {
     // push down projections
     if (!allColumnsNeeded) {
       if (!neededColumnIDs.isEmpty()) {
+        String old = jobConf.get("hive.io.file.readcolumn.ids", null);
+        String oldColName = jobConf.get("hive.io.file.readNestedColumn.paths", null);
+
+        LOG.debug("parquet push down operator OldneededColumnIDs={}, OldneededNestedColumnPaths={}", old, oldColName);
         ColumnProjectionUtils.appendReadColumns(jobConf, new ArrayList<Integer>(neededColumnIDs));
         ColumnProjectionUtils.appendNestedColumnPaths(jobConf,
           new ArrayList<String>(neededNestedColumnPaths));
+
+        String fi = jobConf.get("hive.io.file.readcolumn.ids", null);
+        String fiColName = jobConf.get("hive.io.file.readNestedColumn.paths", null);
+        LOG.debug("After parquet push down operator NewneededColumnIDs={}, NewneededNestedColumnPaths={}", fi, fiColName);
       }
     } else {
       ColumnProjectionUtils.setReadAllColumns(jobConf);

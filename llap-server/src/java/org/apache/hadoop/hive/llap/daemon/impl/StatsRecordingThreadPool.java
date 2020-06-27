@@ -105,6 +105,7 @@ public class StatsRecordingThreadPool extends ThreadPoolExecutor {
       // clone thread local file system statistics
       List<LlapUtil.StatisticsData> statsBefore = LlapUtil.cloneThreadLocalFileSystemStatistics();
 
+      LOG.info("edwin actualCallable class {}", actualCallable.getClass());
       setupMDCFromNDC(actualCallable);
       try {
         return actualCallable.call();

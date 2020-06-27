@@ -67,6 +67,8 @@ import org.apache.hadoop.io.BinaryComparable;
 import org.apache.hadoop.io.Writable;
 
 import com.google.common.base.Preconditions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /*
  *
@@ -88,6 +90,8 @@ import com.google.common.base.Preconditions;
 public class VectorMapOperator extends AbstractMapOperator {
 
   private static final long serialVersionUID = 1L;
+  protected transient final Logger LOG = LoggerFactory.getLogger(getClass().getName());
+
 
   /*
    * Overall information on this vectorized Map operation.
@@ -477,6 +481,8 @@ public class VectorMapOperator extends AbstractMapOperator {
     Iterator<Operator<? extends OperatorDesc>> aliasToWorkIterator =
         conf.getAliasToWork().values().iterator();
     oneRootOperator = aliasToWorkIterator.next();
+    LOG.debug("vector Map operator oneRootOperator class = {}, dump = {}, keySet = {} ",
+            oneRootOperator.getClass().getName(), oneRootOperator.dump(0), conf.getAliasToWork().keySet().toString());
     Preconditions.checkState(!aliasToWorkIterator.hasNext());
 
     internalSetChildren(hconf);
@@ -572,6 +578,10 @@ public class VectorMapOperator extends AbstractMapOperator {
       } else {
         vectorPartitionContext = partitionContextMap.get(partDesc);
       }
+
+      LOG.debug("vetor map internal Path={}, list={}, partition={}, vectorPartitionContext = {}, className={}",
+              path.toString(), entry.getValue().toString(), partDesc.toString(),
+              vectorPartitionContext.toString(), vectorPartitionContext.getClass().getName());
 
       fileToPartitionContextMap.put(path.toString(), vectorPartitionContext);
     }

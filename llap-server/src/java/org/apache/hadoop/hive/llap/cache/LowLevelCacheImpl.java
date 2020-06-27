@@ -40,8 +40,11 @@ import org.apache.hive.common.util.Ref;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class LowLevelCacheImpl implements LowLevelCache, BufferUsageManager, LlapOomDebugDump {
+  public static final Logger LOG = LoggerFactory.getLogger(LowLevelCacheImpl.class);
   private static final int DEFAULT_CLEANUP_INTERVAL = 600;
   private final Allocator allocator;
   private final AtomicInteger newEvictions = new AtomicInteger(0);
@@ -93,6 +96,8 @@ public class LowLevelCacheImpl implements LowLevelCache, BufferUsageManager, Lla
     if (ranges == null) return null;
     DiskRangeList prev = ranges.prev;
     FileCache<ConcurrentSkipListMap<Long, LlapDataBuffer>> subCache = cache.get(fileKey);
+    LOG.debug("LlapCacheImpl prev={}, subCache={}, totalLen={}, cache data = {}",
+            prev, subCache, ranges.getTotalLength(), debugDumpForOom());
     if (subCache == null || !subCache.incRef()) {
       long totalMissed = ranges.getTotalLength();
       metrics.incrCacheRequestedBytes(totalMissed);
@@ -102,6 +107,7 @@ public class LowLevelCacheImpl implements LowLevelCache, BufferUsageManager, Lla
       if (prev != null && gotAllData != null) {
         gotAllData.value = false;
       }
+
       return ranges;
     }
     try {
@@ -248,7 +254,7 @@ public class LowLevelCacheImpl implements LowLevelCache, BufferUsageManager, Lla
       } else {
         // This cache range is a prefix of the requested one; the above also applies.
         // The cache may still contain the rest of the requested range, so don't set gotAllData.
-        currentNotCached.insertPartBefore(currentCached);
+        currentNotCached.F(currentCached);
         return currentNotCached;
       }
     }
@@ -352,6 +358,8 @@ public class LowLevelCacheImpl implements LowLevelCache, BufferUsageManager, Lla
     } finally {
       subCache.decRef();
     }
+
+    LOG.debug("cache put data = {}", debugDumpForOom());
     return result;
   }
 
@@ -461,7 +469,7 @@ public class LowLevelCacheImpl implements LowLevelCache, BufferUsageManager, Lla
             sb.append("\n    [").append(e2.getKey()).append(", ")
               .append(e2.getKey() + e2.getValue().declaredCachedLength)
               .append(") => ").append(e2.getValue().toString())
-              .append(" alloc ").append(e2.getValue().byteBuffer.position());
+              .append(" alloc ").append(e2.getValue().byteBuffer.position()).append(" limit ").append(e2.getValue().byteBuffer.limit());
           } finally {
             e2.getValue().decRef();
           }

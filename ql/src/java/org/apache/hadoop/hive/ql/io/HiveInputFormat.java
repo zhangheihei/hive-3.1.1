@@ -173,6 +173,7 @@ public class HiveInputFormat<K extends WritableComparable, V extends Writable>
 
     @Override
     public String toString() {
+      LOG.debug("edwin HiveInputFormat inputSplit is {}", inputSplit.getClass().getName());
       return inputFormatClassName + ":" + inputSplit.toString();
     }
 
@@ -263,6 +264,10 @@ public class HiveInputFormat<K extends WritableComparable, V extends Writable>
     if (LOG.isDebugEnabled()) {
       LOG.debug("Processing " + ifName);
     }
+
+    LOG.info("inputformat llap for " + ifName + ": supported = "
+            + isSupported + ", vectorized = " + isVectorized + ", cache only = " + isCacheOnly +
+            ", serde based = " + isSerdeBased);
 
     @SuppressWarnings("unchecked")
     LlapIo<VectorizedRowBatch> llapIo = LlapProxy.getIo();
@@ -405,7 +410,7 @@ public class HiveInputFormat<K extends WritableComparable, V extends Writable>
 
     Path splitPath = hsplit.getPath();
     pushProjectionsAndFilters(job, inputFormatClass, splitPath, nonNative);
-
+    LOG.debug("edwin test map.xml");
     InputFormat inputFormat = getInputFormatFromCache(inputFormatClass, job);
     try {
       inputFormat = HiveInputFormat.wrapForLlap(inputFormat, job, part);
@@ -884,7 +889,8 @@ public class HiveInputFormat<K extends WritableComparable, V extends Writable>
     if(this.mrwork.getPathToAliases() == null) {
       return;
     }
-
+    LOG.debug("pushProjectionsAndFilters splitPathWithNoSchema={}, aliases={} ",
+            splitPathWithNoSchema.toString(), this.mrwork.getPathToAliases().toString());
     ArrayList<String> aliases = new ArrayList<String>();
     Iterator<Entry<Path, ArrayList<String>>> iterator = this.mrwork
         .getPathToAliases().entrySet().iterator();
@@ -934,6 +940,9 @@ public class HiveInputFormat<K extends WritableComparable, V extends Writable>
         alias);
       if (op instanceof TableScanOperator) {
         TableScanOperator ts = (TableScanOperator) op;
+        LOG.debug("pushProjectionsAndFilters alias={}, ids={}, columns={}, olumnpaths={}",
+                alias, ts.getNeededColumnIDs(), ts.getNeededColumns(), ts.getNeededNestedColumnPaths());
+
         // push down projections.
         ColumnProjectionUtils.appendReadColumns(
             jobConf, ts.getNeededColumnIDs(), ts.getNeededColumns(), ts.getNeededNestedColumnPaths());

@@ -77,9 +77,12 @@ public class ParquetRecordReaderBase {
       // TODO enable MetadataFilter by using readFooter(Configuration configuration, Path file,
       // MetadataFilter filter) API
       final ParquetMetadata parquetMetadata = ParquetFileReader.readFooter(jobConf, finalPath);
+      LOG.debug("ParquetInputSplit getSplit footer={}", parquetMetadata);
       final List<BlockMetaData> blocks = parquetMetadata.getBlocks();
       final FileMetaData fileMetaData = parquetMetadata.getFileMetaData();
-
+      LOG.debug("################# after ParquetFileReader.readFooter");
+      LOG.debug("parquet footer blocks = {}", blocks);
+      LOG.debug("parquet fileMetaData = {}", fileMetaData);
       final ReadSupport.ReadContext
         readContext = new DataWritableReadSupport().init(new InitContext(jobConf,
         null, fileMetaData.getSchema()));
@@ -92,10 +95,14 @@ public class ParquetRecordReaderBase {
 
       schemaSize = MessageTypeParser.parseMessageType(readContext.getReadSupportMetadata()
         .get(DataWritableReadSupport.HIVE_TABLE_AS_PARQUET_SCHEMA)).getFieldCount();
+      LOG.debug("$$$$$$$$$$$$$$$$ after DataWritableReadSupport().init schemaSize={}", schemaSize);
+
       final List<BlockMetaData> splitGroup = new ArrayList<BlockMetaData>();
       final long splitStart = ((FileSplit) oldSplit).getStart();
       final long splitLength = ((FileSplit) oldSplit).getLength();
       for (final BlockMetaData block : blocks) {
+        LOG.debug("parquet file splitStart={}, splitLength={}, blocksSize={}, pageoffset={}",
+                splitStart, splitLength, blocks.size(), block.getColumns().get(0).getFirstDataPageOffset());
         final long firstDataPage = block.getColumns().get(0).getFirstDataPageOffset();
         if (firstDataPage >= splitStart && firstDataPage < splitStart + splitLength) {
           splitGroup.add(block);
@@ -119,9 +126,11 @@ public class ParquetRecordReaderBase {
           LOG.debug("Dropping " + droppedBlocks + " row groups that do not pass filter predicate");
         }
       } else {
+        LOG.debug("parquet filter push down is nil");
         filtedBlocks = splitGroup;
       }
-
+      LOG.debug("parquete timestamp skip conversion = {}", HiveConf.getBoolVar(conf, HiveConf.ConfVars.HIVE_PARQUET_TIMESTAMP_SKIP_CONVERSION));
+      LOG.debug("parquet oldSplit={}, location={}", oldSplit, oldSplit.getLocations());
       if (HiveConf.getBoolVar(conf, HiveConf.ConfVars.HIVE_PARQUET_TIMESTAMP_SKIP_CONVERSION)) {
         skipTimestampConversion = !Strings.nullToEmpty(fileMetaData.getCreatedBy()).startsWith("parquet-mr");
       }
@@ -134,6 +143,7 @@ public class ParquetRecordReaderBase {
         fileMetaData.getSchema().toString(),
         fileMetaData.getKeyValueMetaData(),
         readContext.getReadSupportMetadata());
+      LOG.debug("parquet file split = {}", split.toString());
       return split;
     } else {
       throw new IllegalArgumentException("Unknown split type: " + oldSplit);

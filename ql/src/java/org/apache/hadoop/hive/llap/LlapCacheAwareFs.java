@@ -91,6 +91,7 @@ public class LlapCacheAwareFs extends FileSystem {
   }
 
   private LlapCacheAwareFs.CacheAwareInputStream getCtx(Path path) {
+    long id = extractSplitId(path);
     return files.get(extractSplitId(path));
   }
 
@@ -203,7 +204,9 @@ public class LlapCacheAwareFs extends FileSystem {
 
     @Override
     public int read(byte[] array, final int arrayOffset, final int len) throws IOException {
+      LOG.debug("llap cache read position= " + position + " arrayLen= " + array.length + " arrayOffset= " + arrayOffset + " len= " + len );
       long readStartPos = position;
+      long readEndPos = readStartPos + len;
       DiskRangeList drl = new DiskRangeList(readStartPos, readStartPos + len);
       DataCache.BooleanRef gotAllData = new DataCache.BooleanRef();
       drl = cache.getFileData(fileKey, drl, 0, new DataCache.DiskRangeListFactory() {
@@ -214,14 +217,30 @@ public class LlapCacheAwareFs extends FileSystem {
         }
       }, gotAllData);
       if (LOG.isInfoEnabled()) {
-        LOG.info("Buffers after cache " + RecordReaderUtils.stringifyDiskRanges(drl));
+        LOG.info("Buffers after cache " + RecordReaderUtils.stringifyDiskRanges(drl) +
+                "gotAllData " + gotAllData.value + " drl class= " + drl.getClass().getName());
       }
       if (gotAllData.value) {
         long sizeRead = 0;
         while (drl != null) {
           assert drl.hasData();
+          LOG.debug("llap cached data drl class= " + drl.getClass().getName());
+          boolean setCacheBufferPosition = false;
           long from = drl.getOffset(), to = drl.getEnd();
+          if (from < readStartPos) {
+            from = readStartPos;
+            setCacheBufferPosition=true;
+          }
+          if (to > readEndPos) {
+            to = readEndPos;
+          }
+
           int offsetFromReadStart = (int)(from - readStartPos), candidateSize = (int)(to - from);
+
+          if (setCacheBufferPosition) {
+            drl.getData().position(Integer.parseInt(String.valueOf(from)));
+          }
+          //调用duplicate方法实际上会创建原缓存区的一个拷贝，不是深拷贝，是浅拷贝，什么意思呢，就是这两个缓存区会共享数据元素，但每个缓存区的上界、容量、位置等属性是各自独立的；
           ByteBuffer data = drl.getData().duplicate();
           data.get(array, arrayOffset + offsetFromReadStart, candidateSize);
           sizeRead += candidateSize;
@@ -240,19 +259,47 @@ public class LlapCacheAwareFs extends FileSystem {
       FileSystem fs = path.getFileSystem(conf);
       FSDataInputStream is = fs.open(path, bufferSize);
       Allocator allocator = cache.getAllocator();
+      LOG.debug("llap cache fsSystem= " + fs.getClass().getName() + "allocator class= " + allocator.getClass().getName());
+
       long sizeRead = 0;
       while (current != null) {
+        LOG.debug("llap cache data");
         DiskRangeList candidate = current;
         current = current.next;
+        boolean setCacheBufferPosition = false;
         long from = candidate.getOffset(), to = candidate.getEnd();
+        if (from < readStartPos) {
+          from = readStartPos;
+          setCacheBufferPosition=true;
+        }
+        if (to > readEndPos) {
+          to = readEndPos;
+        }
+
         // The offset in the destination array for the beginning of this missing range.
         int offsetFromReadStart = (int)(from - readStartPos), candidateSize = (int)(to - from);
+
+        //from=7891192 to=12033926 offsetFromReadStart=(7891192-4)=7891188 candidateSize=4142734
+        //arrayOffset=0
+        //len=8388608  7891188 4142734
         if (candidate.hasData()) {
+          if (setCacheBufferPosition) {
+            candidate.getData().position(Integer.parseInt(String.valueOf(from)));
+          }
+          LOG.debug("cache buffer position= " + candidate.getData().position() + " limit= " + candidate.getData().limit()
+          + " capcatity= " + candidate.getData().capacity() + " array length= " + array.length + " (arrayOffset + offsetFromReadStart)= "
+                  + (arrayOffset + offsetFromReadStart) + " candidateSize= " + candidateSize + " from = " + from + " to " + to);
+          //调用duplicate方法实际上会创建原缓存区的一个拷贝，不是深拷贝，是浅拷贝，什么意思呢，就是这两个缓存区会共享数据元素，但每个缓存区的上界、容量、位置等属性是各自独立的；
           ByteBuffer data = candidate.getData().duplicate();
           data.get(array, arrayOffset + offsetFromReadStart, candidateSize);
           sizeRead += candidateSize;
           continue;
         }
+
+        LOG.debug("llap cache current = " + current + "bufferSize="+ bufferSize + " canidtateHasData=" +
+                candidate.hasData() + " candidate class= " + candidate.getClass().getName() + " from=" + from + " to= " + to +
+                " offsetFromReadStart=" + offsetFromReadStart + " candidateSize=" + candidateSize + " sizeRead=" + sizeRead);
+
         // The data is not in cache.
 
         // Account for potential partial chunks.
@@ -261,19 +308,24 @@ public class LlapCacheAwareFs extends FileSystem {
         is.seek(from);
         is.readFully(array, arrayOffset + offsetFromReadStart, candidateSize);
         sizeRead += candidateSize;
+        LOG.debug("llap cahce after missingchunks sizeRead= " + sizeRead);
         // Now copy missing chunks (and parts of chunks) into cache buffers.
         if (fileKey == null || cache == null) continue;
         int extraDiskDataOffset = 0;
         // TODO: should we try to make a giant array for one cache call to avoid overhead?
         for (Map.Entry<Long, Long> missingChunk : chunksInThisRead.entrySet()) {
+
           long chunkFrom = Math.max(from, missingChunk.getKey()),
               chunkTo = Math.min(to, missingChunk.getValue()),
               chunkLength = chunkTo - chunkFrom;
+          LOG.debug("llap cache process missingChunk chunkFrom= " + chunkFrom + " chunkTo= " + chunkTo + " chunkLength= " + chunkLength);
           MemoryBuffer[] largeBuffers = null, smallBuffer = null, newCacheData = null;
           try {
             int largeBufCount = (int) (chunkLength / maxAlloc);
             int smallSize = (int) (chunkLength % maxAlloc);
             int chunkPartCount = largeBufCount + ((smallSize > 0) ? 1 : 0);
+            LOG.debug("llap cache process largeBufCount= " + largeBufCount +
+                    " smallSize= " + smallSize + " chunkPartCount= " + chunkPartCount);
             DiskRange[] cacheRanges = new DiskRange[chunkPartCount];
             int extraOffsetInChunk = 0;
             if (maxAlloc < chunkLength) {
@@ -297,6 +349,8 @@ public class LlapCacheAwareFs extends FileSystem {
               smallBuffer = new MemoryBuffer[1];
               allocator.allocateMultiple(smallBuffer, smallSize, cache.getDataBufferFactory());
               ByteBuffer bb = smallBuffer[0].getByteBufferRaw();
+              LOG.debug("buffer: smallSize= " + smallSize + " capacity= " + smallBuffer[0].getByteBufferRaw().capacity()
+              + "limit= " + smallBuffer[0].getByteBufferRaw().limit() + " position= " + smallBuffer[0].getByteBufferRaw().position());
               copyDiskDataToCacheBuffer(array,
                   arrayOffset + offsetFromReadStart + extraDiskDataOffset,
                   smallSize, bb, cacheRanges, largeBufCount, chunkFrom + extraOffsetInChunk);
@@ -336,6 +390,7 @@ public class LlapCacheAwareFs extends FileSystem {
           }
         }
       }
+
       validateAndUpdatePosition(len, sizeRead);
       return len;
     }
@@ -356,6 +411,8 @@ public class LlapCacheAwareFs extends FileSystem {
         LOG.trace("Caching [" + cacheRangeStart + ", " + cacheRangeEnd + ")");
       }
       cacheRanges[cacheRangeIx] = new DiskRange(cacheRangeStart, cacheRangeEnd);
+      LOG.debug("Caching In Copy [" + cacheRangeStart + ", " + cacheRangeEnd + ")" + " offsetInDiskData =" +
+              offsetInDiskData + " DiskRange=" + cacheRanges[cacheRangeIx]);
       cacheBuffer.put(diskData, offsetInDiskData, sizeToCopy);
       cacheBuffer.position(bbPos);
     }
@@ -366,6 +423,7 @@ public class LlapCacheAwareFs extends FileSystem {
       if (firstMissing == null) {
         throw new AssertionError("No lower bound for offset " + from);
       }
+
       if (firstMissing.getValue() <= from
           || ((from - firstMissing.getKey()) % maxAlloc) != 0) {
         // The data does not belong to a recognized chunk, or is split wrong.
@@ -378,6 +436,22 @@ public class LlapCacheAwareFs extends FileSystem {
       }
       long lastMissingOffset = missingChunks.lastKey(),
           lastMissingEnd = missingChunks.get(lastMissingOffset);
+      LOG.debug("llap MissingChunk maxAlloc= " + maxAlloc + " from= " + from + " to= " + to
+            + " firstMissing= " + firstMissing + " missingChunks= " + missingChunks);
+      //check partial chunk in consecutive chunk, then split chunk
+      if (to < lastMissingEnd) {
+        missingChunks.put(lastMissingOffset, to);
+        chunkIndex.put(to, lastMissingEnd);
+        lastMissingEnd = to;
+      }
+
+      LOG.debug("llap MissingChunk maxAlloc= " + maxAlloc + " from= " + from + " to= " + to
+              + " firstMissing= " + firstMissing + " missingChunks= " + missingChunks);
+
+      //{4=1754, 1754=2542, 2542=12524, 12524=41476, 41476=68390, 68390=234190, 234190=7374964, 7891192=12033926}
+      //{68390=234190, 234190=7374964, 7374964=7891192, 7891192=12033926, 12041741=18123836, 18123836=18559959, 18562497=19991690, 19991690=20955522}
+      //68390=234190, 234190=7374964, 7374964=7891192, 7891192=12033926
+      //68390=234190, 234190=7374964, 7374964=7891192, 7891192=8456998, 8456998=12033926
       if (lastMissingEnd < to
           || (to != lastMissingEnd && ((to - lastMissingOffset) % maxAlloc) != 0)) {
         // The data does not belong to a recognized chunk, or is split wrong.

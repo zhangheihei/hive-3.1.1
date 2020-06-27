@@ -46,11 +46,17 @@ public class HdfsUtils {
 
   public static Object getFileId(FileSystem fileSystem, Path path,
       boolean allowSynthetic, boolean checkDefaultFs) throws IOException {
+    LOG.debug("FildeId fileSystem={}, class={}, allowSynthetic={}, checkDefaultFs={}",
+            fileSystem, fileSystem.getClass().getName(), allowSynthetic, checkDefaultFs);
     if (fileSystem instanceof DistributedFileSystem) {
       DistributedFileSystem dfs = (DistributedFileSystem) fileSystem;
       if ((!checkDefaultFs) || isDefaultFs(dfs)) {
+        LOG.debug("FildeId path={} uri={}", path, path.toUri().getPath());
         Object result = SHIMS.getFileId(dfs, path.toUri().getPath());
-        if (result != null) return result;
+        if (result != null) {
+          LOG.debug("FildeId path={} uri={} result = {}", path, path.toUri().getPath(), result);
+          return result;
+        }
       }
     }
     if (!allowSynthetic) {
@@ -59,6 +65,7 @@ public class HdfsUtils {
       return null;
     }
     FileStatus fs = fileSystem.getFileStatus(path);
+    LOG.debug("FildeId path={} fs={}, fs.getLen= {}, fs.getModificationTime={}", path, fs, fs.getLen(), fs.getModificationTime());
     return new SyntheticFileId(path, fs.getLen(), fs.getModificationTime());
   }
 

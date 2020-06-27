@@ -380,7 +380,8 @@ public abstract class Operator<T extends OperatorDesc> implements Serializable,C
         throw new AssertionError("Internal error during operator initialization");
       }
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Initialization Done " + id + " " + getName());
+        LOG.debug("Initialization Done " + id + " " + getName() + " childOperators.size == "
+                + childOperators.size()+ " parentOperators.size == " + parentOperators.size());
       }
 
       initializeChildren(hconf);

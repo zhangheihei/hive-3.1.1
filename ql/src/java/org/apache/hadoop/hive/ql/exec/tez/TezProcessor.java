@@ -21,11 +21,15 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 import java.text.NumberFormat;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.zip.InflaterInputStream;
 
+import com.google.protobuf.ByteString;
 import org.apache.hadoop.hive.conf.Constants;
+import org.apache.tez.dag.api.records.DAGProtos;
 import org.apache.tez.runtime.api.TaskFailureType;
 import org.apache.tez.runtime.api.events.CustomProcessorEvent;
 import org.slf4j.Logger;
@@ -174,13 +178,26 @@ public class TezProcessor extends AbstractLogicalIOProcessor {
   public void initialize() throws IOException {
     perfLogger.PerfLogBegin(CLASS_NAME, PerfLogger.TEZ_INITIALIZE_PROCESSOR);
     Configuration conf = TezUtils.createConfFromUserPayload(getContext().getUserPayload());
+    {
+      Map<String, String> properConf = new LinkedHashMap<String, String>();
+      InflaterInputStream uncompressIs = new InflaterInputStream(ByteString.copyFrom(getContext().getUserPayload().getPayload()).newInput());
+      DAGProtos.ConfigurationProto confProto = DAGProtos.ConfigurationProto.parseFrom(uncompressIs);
+      List<DAGProtos.PlanKeyValuePair> settingList = confProto.getConfKeyValuesList();
+      for (DAGProtos.PlanKeyValuePair setting : settingList) {
+        properConf.put(setting.getKey(), setting.getValue());
+      }
+      LOG.debug("tez process protobuf={}", properConf.toString());
+    }
     this.jobConf = new JobConf(conf);
     this.processorContext = getContext();
     ExecutionContext execCtx = processorContext.getExecutionContext();
+    LOG.info("ExecutionContext execCtx is {}, hostName {}, class {}, jobConf={}, conf={}",
+            execCtx.toString(), execCtx.getHostName(), execCtx.getClass(), jobConf.toString(), conf.toString());
     if (execCtx instanceof Hook) {
       ((Hook)execCtx).initializeHook(this);
     }
     setupMRLegacyConfigs(processorContext);
+    LOG.info("ExecutionContext after setupMRLegacyConfigs, jobConf={}", jobConf.toString());
     perfLogger.PerfLogEnd(CLASS_NAME, PerfLogger.TEZ_INITIALIZE_PROCESSOR);
   }
 
@@ -264,6 +281,7 @@ public class TezProcessor extends AbstractLogicalIOProcessor {
       // which does not belong to the lock, the abort will end up getting blocked.
       // Both of these method invocations need to handle the abort call on their own.
       rproc.init(mrReporter, inputs, outputs);
+      LOG.info("LLap inputs={}, outputs={}", inputs.toString(), outputs.toString());
       rproc.run();
 
       //done - output does not need to be committed as hive does not use outputcommitter

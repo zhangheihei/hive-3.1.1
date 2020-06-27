@@ -9,7 +9,9 @@ yarnfile = """
       "yarn.component.placement.policy" : "%(placement)d",
       "yarn.container.health.threshold.percent": "%(health_percent)d",
       "yarn.container.health.threshold.window.secs": "%(health_time_window)d",
-      "yarn.container.health.threshold.init.delay.secs": "%(health_init_delay)d"%(service_appconfig_global_append)s
+      "yarn.container.health.threshold.init.delay.secs": "%(health_init_delay)d"%(service_appconfig_global_append)s,
+      "yarn.service.am.java.opts":"-Xmx%(service.am.container.mb)dm",
+      "yarn.service.am-resource.memory": "%(service.am.container.mb)d"
     }
   },
   "components": [
@@ -22,7 +24,7 @@ yarnfile = """
         "type": "TARBALL"
       },
       "resource": {
-        "cpus": 1,
+        "cpus": %(container.cores)d,
         "memory": "%(container.mb)d"
       },
       "configuration": {

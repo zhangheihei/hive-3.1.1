@@ -28,6 +28,7 @@ import java.util.concurrent.TimeUnit;
 
 import javax.management.ObjectName;
 
+import org.apache.hadoop.hive.llap.cache.*;
 import org.apache.hadoop.hive.llap.daemon.impl.StatsRecordingThreadPool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,21 +42,6 @@ import org.apache.hadoop.hive.common.io.Allocator.BufferObjectFactory;
 import org.apache.hadoop.hive.common.io.encoded.MemoryBuffer;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
-import org.apache.hadoop.hive.llap.cache.BuddyAllocator;
-import org.apache.hadoop.hive.llap.cache.BufferUsageManager;
-import org.apache.hadoop.hive.llap.cache.CacheContentsTracker;
-import org.apache.hadoop.hive.llap.cache.EvictionDispatcher;
-import org.apache.hadoop.hive.llap.cache.LlapDataBuffer;
-import org.apache.hadoop.hive.llap.cache.LlapOomDebugDump;
-import org.apache.hadoop.hive.llap.cache.LowLevelCache;
-import org.apache.hadoop.hive.llap.cache.LowLevelCacheImpl;
-import org.apache.hadoop.hive.llap.cache.LowLevelCacheMemoryManager;
-import org.apache.hadoop.hive.llap.cache.LowLevelCachePolicy;
-import org.apache.hadoop.hive.llap.cache.LowLevelFifoCachePolicy;
-import org.apache.hadoop.hive.llap.cache.LowLevelLrfuCachePolicy;
-import org.apache.hadoop.hive.llap.cache.SerDeLowLevelCacheImpl;
-import org.apache.hadoop.hive.llap.cache.SimpleAllocator;
-import org.apache.hadoop.hive.llap.cache.SimpleBufferManager;
 import org.apache.hadoop.hive.llap.cache.LowLevelCache.Priority;
 import org.apache.hadoop.hive.llap.io.api.LlapIo;
 import org.apache.hadoop.hive.llap.io.decode.ColumnVectorProducer;
@@ -141,6 +127,8 @@ public class LlapIoImpl implements LlapIo<VectorizedRowBatch> {
       boolean useLrfu = HiveConf.getBoolVar(conf, HiveConf.ConfVars.LLAP_USE_LRFU);
       long totalMemorySize = HiveConf.getSizeVar(conf, ConfVars.LLAP_IO_MEMORY_MAX_SIZE);
       int minAllocSize = (int)HiveConf.getSizeVar(conf, ConfVars.LLAP_ALLOCATOR_MIN_ALLOC);
+      LOG.debug("LlapIoImpl hive.llap.io.memory.size={}, hive.llap.io.allocator.alloc.min={}", totalMemorySize, minAllocSize);
+
       LowLevelCachePolicy cp = useLrfu ? new LowLevelLrfuCachePolicy(
           minAllocSize, totalMemorySize, conf) : new LowLevelFifoCachePolicy();
       boolean trackUsage = HiveConf.getBoolVar(conf, HiveConf.ConfVars.LLAP_TRACK_CACHE_USAGE);

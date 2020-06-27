@@ -445,11 +445,18 @@ public final class Utilities {
             LOG.info("Could not find plan string in conf");
             return null;
           }
+          LOG.debug("edwin Loading plan is string= {}", planString);
+
           serializedSize = planString.length();
           planMode = "RPC";
           byte[] planBytes = Base64.decodeBase64(planString);
           in = new ByteArrayInputStream(planBytes);
           in = new InflaterInputStream(in);
+
+          String mapXml = new String(planBytes);
+          //LOG.debug("edwin Loading mapXml is string= {}", mapXml);
+
+
         } else {
           LOG.debug("Open file to read in plan: {}", localPath);
           FileSystem fs = localPath.getFileSystem(conf);

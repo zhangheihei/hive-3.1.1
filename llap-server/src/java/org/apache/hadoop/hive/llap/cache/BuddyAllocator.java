@@ -45,9 +45,12 @@ import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.llap.io.api.impl.LlapIoImpl;
 import org.apache.hadoop.hive.llap.metrics.LlapDaemonCacheMetrics;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class BuddyAllocator
   implements EvictionAwareAllocator, BuddyAllocatorMXBean, LlapOomDebugDump {
+  public static final Logger LOG = LoggerFactory.getLogger(BuddyAllocator.class);
   private final Arena[] arenas;
   private final AtomicInteger allocatedArenas = new AtomicInteger(0);
 
@@ -241,6 +244,10 @@ public final class BuddyAllocator
     int freeListIx = determineFreeListForAllocation(size);
     int allocLog2 = freeListIx + minAllocLog2;
     int allocationSize = 1 << allocLog2;
+
+    LOG.debug("minAllocation={}, minAllocLog2={}, maxAllocation={}, maxAllocLog2={}, arenaSize={}, " +
+                    "arenaSizeLog2={}, size={}, allocLog2={}, allocationSize={}",
+            minAllocation, minAllocLog2, maxAllocation, maxAllocLog2, arenaSize, arenaSizeLog2, freeListIx, allocLog2, allocationSize);
 
     // If using async, we could also reserve one by one.
     memoryManager.reserveMemory(dest.length << allocLog2);

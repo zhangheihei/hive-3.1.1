@@ -656,6 +656,7 @@ public class HiveStreamingConnection implements StreamingConnection {
 
         List<Long> txnIds = openTxnImpl(username, numTxns);
         txnToWriteIds = allocateWriteIdsImpl(txnIds);
+        //一定为1
         assert (txnToWriteIds.size() == numTxns);
 
         txnStatus = new TxnState[numTxns];
@@ -834,7 +835,7 @@ public class HiveStreamingConnection implements StreamingConnection {
     }
 
 
-    void commit() throws StreamingException {
+    void  commit() throws StreamingException {
       checkIsClosed();
       boolean success = false;
       try {

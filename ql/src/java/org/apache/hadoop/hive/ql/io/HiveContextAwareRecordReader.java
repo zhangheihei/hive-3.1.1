@@ -205,6 +205,8 @@ public abstract class HiveContextAwareRecordReader<K, V> implements RecordReader
       in.close();
     }
     this.jobConf = job;
+    LOG.debug("LLAP HiveRecordReader blockStart={}, blockPointer={}, inputFormatClass = {}, recordReader={}", blockStart,
+            blockPointer, inputFormatClass.getName(), recordReader.getClass());
     this.initIOContext(blockStart, blockPointer, path.makeQualified(fs));
 
     this.initIOContextSortedProps(split, recordReader, job);
@@ -314,6 +316,7 @@ public abstract class HiveContextAwareRecordReader<K, V> implements RecordReader
        * If file contains footer, used a FooterBuffer to remove footer lines
        * at the end of the table file.
        **/
+      LOG.debug("reader file block start = {}, sorted = {}", this.ioCxtRef.getCurrentBlockStart(), this.isSorted);
       if (this.ioCxtRef.getCurrentBlockStart() == 0) {
 
         // Check if the table file has header to skip.

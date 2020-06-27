@@ -316,6 +316,7 @@ public class OperatorUtils {
     for (Operator<? extends OperatorDesc> op : operators) {
       if (op.getConf() != null) {
         op.getConf().setMaxMemoryAvailable(memoryAvailableToTask);
+        LOG.debug("setMemory operator is = {}", op.dump(0));
       }
       if (op.getChildOperators() != null && !op.getChildOperators().isEmpty()) {
         setMemoryAvailable(op.getChildOperators(), memoryAvailableToTask);

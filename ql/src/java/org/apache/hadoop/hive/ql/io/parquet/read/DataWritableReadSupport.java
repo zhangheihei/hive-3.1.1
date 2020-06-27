@@ -49,6 +49,8 @@ import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName;
 import org.apache.parquet.schema.Type;
 import org.apache.parquet.schema.Type.Repetition;
 import org.apache.parquet.schema.Types;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  *
@@ -58,6 +60,7 @@ import org.apache.parquet.schema.Types;
  *
  */
 public class DataWritableReadSupport extends ReadSupport<ArrayWritable> {
+  public static final Logger LOG = LoggerFactory.getLogger(DataWritableReadSupport.class);
 
   public static final String HIVE_TABLE_AS_PARQUET_SCHEMA = "HIVE_TABLE_SCHEMA";
   public static final String PARQUET_COLUMN_INDEX_ACCESS = "parquet.column.index.access";
@@ -356,6 +359,8 @@ public class DataWritableReadSupport extends ReadSupport<ArrayWritable> {
       MessageType tableSchema =
         getRequestedSchemaForIndexAccess(indexAccess, columnNamesList, columnTypesList, fileSchema);
 
+      LOG.debug("parquet columnname columnNames={}, columnNamesList={}, fileSchema={}, tableSchema={}",
+              columnNames, columnNamesList,fileSchema, tableSchema);
       contextMetadata.put(HIVE_TABLE_AS_PARQUET_SCHEMA, tableSchema.toString());
       contextMetadata.put(PARQUET_COLUMN_INDEX_ACCESS, String.valueOf(indexAccess));
       this.hiveTypeInfo = TypeInfoFactory.getStructTypeInfo(columnNamesList, columnTypesList);
@@ -422,8 +427,12 @@ public class DataWritableReadSupport extends ReadSupport<ArrayWritable> {
     Configuration configuration) {
     Set<String> groupPaths = ColumnProjectionUtils.getNestedColumnPaths(configuration);
     List<Integer> indexColumnsWanted = ColumnProjectionUtils.getReadColumnIDs(configuration);
+    LOG.debug("NestedColumnPaths = {}, ReadColumnIDs={}, indexColumnsWanted={}",
+            groupPaths.toString(), configuration.get("hive.io.file.readcolumn.ids", ""), indexColumnsWanted.toString());
     if (!ColumnProjectionUtils.isReadAllColumns(configuration) && !indexColumnsWanted.isEmpty()) {
-      return getProjectedSchema(fileSchema, columnNamesList, indexColumnsWanted, groupPaths);
+      MessageType tmp = getProjectedSchema(fileSchema, columnNamesList, indexColumnsWanted, groupPaths);
+      LOG.debug("parquet read need column messaetype = {}", tmp);
+      return tmp;
     } else {
       return fileSchema;
     }

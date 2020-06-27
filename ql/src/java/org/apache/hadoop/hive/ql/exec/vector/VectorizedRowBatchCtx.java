@@ -271,7 +271,7 @@ public class VectorizedRowBatchCtx {
     PartitionDesc partDesc = HiveFileFormatUtils
         .getFromPathRecursively(pathToPartitionInfo,
             split.getPath(), IOPrepareCache.get().getPartitionDescMap());
-
+    LOG.debug("vector batch getPartitionValues partDesc={}, path={}", partDesc, split.getPath());
     getPartitionValues(vrbCtx, partDesc, partitionValues);
   }
 
@@ -303,6 +303,8 @@ public class VectorizedRowBatchCtx {
         if (partColTypeInfo instanceof CharTypeInfo) {
           objectValue = ((HiveChar) objectValue).getStrippedValue();
         }
+        LOG.debug("vector batch getPartitionValues key={}, objectValue={}", key, objectValue);
+
       }
       partitionValues[i] = objectValue;
     }
@@ -331,7 +333,11 @@ public class VectorizedRowBatchCtx {
     final int totalColumnCount =
         nonScratchColumnCount + scratchColumnTypeNames.length;
     VectorizedRowBatch result = new VectorizedRowBatch(totalColumnCount);
-
+    LOG.debug("createVectorizedRowBatch nonScratchColumnCount={}, ScratchColumnCoun={}, dataColumnNums={}",
+            nonScratchColumnCount,scratchColumnTypeNames.length, dataColumnNums);
+    LOG.debug("createVectorizedRowBatch rowColumnNames={}, rowColumnTypeInfos={}, rowDataTypePhysicalVariations={}, " +
+                    "scratchColumnTypeNames={}, scratchDataTypePhysicalVariations={}",
+            rowColumnNames, rowColumnTypeInfos, rowDataTypePhysicalVariations, scratchColumnTypeNames, scratchDataTypePhysicalVariations);
     if (dataColumnNums == null) {
         // All data and partition columns.
       for (int i = 0; i < nonScratchColumnCount; i++) {
@@ -371,8 +377,9 @@ public class VectorizedRowBatchCtx {
 
     // UNDONE: Also remember virtualColumnCount...
     result.setPartitionInfo(dataColumnCount, partitionColumnCount);
-
+    //LOG.debug("VectorizedRowBatch before reset result={}", result.toString());
     result.reset();
+    LOG.debug("VectorizedRowBatch result={}, cols={}", result.toString(), result.cols);
     return result;
   }
 
@@ -390,6 +397,7 @@ public class VectorizedRowBatchCtx {
 
   public void addPartitionColsToBatch(ColumnVector[] cols, Object[] partitionValues)
   {
+    LOG.debug("VectorizedRowBatch add partition cols={}, partitionValues={}, dataColumnCount={}", cols.toString(), partitionValues, dataColumnCount);
     if (partitionValues != null) {
       for (int i = 0; i < partitionColumnCount; i++) {
         Object value = partitionValues[i];

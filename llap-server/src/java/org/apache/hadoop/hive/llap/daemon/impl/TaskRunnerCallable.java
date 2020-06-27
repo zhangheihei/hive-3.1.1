@@ -24,6 +24,7 @@ import com.google.common.collect.Multimap;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
+import com.google.protobuf.ByteString;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.hive.llap.counters.LlapWmCounters;
@@ -257,9 +258,12 @@ public class TaskRunnerCallable extends CallableWithNdc<TaskRunner2Result> {
               LlapTaskUmbilicalProtocol.versionID, address, taskOwner, conf, socketFactory);
         }
       });
-
       String fragmentId = LlapTezUtils.stripAttemptPrefix(taskSpec.getTaskAttemptID().toString());
-      taskReporter = new LlapTaskReporter(
+      //ByteString descriptorStr = ByteString.copyFrom(taskSpec.getProcessorDescriptor().getUserPayload().getPayload());
+        LOG.debug("edwin TezConf={}, fragmentId={}, fragmentInfo={}, localDir={}, taskSpec-descriptorStr={} ", conf.toString(),
+                fragmentId, fragmentInfo.toString(), fragmentInfo.getLocalDirs());
+
+        taskReporter = new LlapTaskReporter(
           completionListener,
           umbilical,
           confParams.amHeartbeatIntervalMsMax,
