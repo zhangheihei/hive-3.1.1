@@ -12316,7 +12316,10 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       compiler.init(queryState, console, db);
       compiler.compile(pCtx, rootTasks, inputs, outputs);
       fetchTask = pCtx.getFetchTask();
-      LOG.debug("edwin after Optimize Physical fetchTask: " + fetchTask.toString());
+      if (fetchTask != null) {
+        LOG.debug("edwin after Optimize Physical fetchTask: " + fetchTask.toString());
+
+      }
       LOG.debug("edwin after Optimize Physical rootTasks: " + rootTasks.toString());
     }
     //find all Acid FileSinkOperatorS

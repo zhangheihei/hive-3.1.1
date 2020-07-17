@@ -119,6 +119,8 @@ public abstract class TaskCompiler {
     boolean isCStats = pCtx.getQueryProperties().isAnalyzeRewrite();
     int outerQueryLimit = pCtx.getQueryProperties().getOuterQueryLimit();
 
+    LOG.debug("before physical isCStats ={}", isCStats);
+
     if (pCtx.getFetchTask() != null) {
       if (pCtx.getFetchTask().getTblDesc() == null) {
         return;

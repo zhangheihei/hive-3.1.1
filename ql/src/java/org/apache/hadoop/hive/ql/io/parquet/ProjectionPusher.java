@@ -156,7 +156,8 @@ public class ProjectionPusher {
     // push down projections
     if (!allColumnsNeeded) {
       if (!neededColumnIDs.isEmpty()) {
-        String old = jobConf.get("hive.io.file.readcolumn.ids", null);
+        String old = jobConf.get("" +
+                "hive.io.file.readcolumn.ids", null);
         String oldColName = jobConf.get("hive.io.file.readNestedColumn.paths", null);
 
         LOG.debug("parquet push down operator OldneededColumnIDs={}, OldneededNestedColumnPaths={}", old, oldColName);

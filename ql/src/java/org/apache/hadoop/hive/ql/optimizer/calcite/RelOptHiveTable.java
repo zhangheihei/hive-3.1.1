@@ -605,12 +605,14 @@ public class RelOptHiveTable extends RelOptAbstractTable {
           projIndxSet.remove(i);
         }
       }
+      System.out.printf("edwin getColStat projIndxSet:%s, colStatsBldr:%s, hiveColStatsMap:%s \n", projIndxSet, colStatsBldr, hiveColStatsMap.toString());
       if (!projIndxSet.isEmpty()) {
         updateColStats(projIndxSet, allowMissingStats);
         for (Integer i : projIndxSet) {
           colStatsBldr.add(hiveColStatsMap.get(i));
         }
       }
+      System.out.printf("edwin after updateColStats  projIndxSet:%s, colStatsBldr:%s, hiveColStatsMap:%s \n", projIndxSet, colStatsBldr, hiveColStatsMap.toString());
     } else {
       List<Integer> pILst = new ArrayList<Integer>();
       for (Integer i = 0; i < noOfNonVirtualCols; i++) {

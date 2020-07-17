@@ -19,6 +19,7 @@
 package org.apache.hadoop.hive.ql.optimizer.metainfo.annotation;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -44,16 +45,19 @@ import org.apache.hadoop.hive.ql.optimizer.Transform;
 import org.apache.hadoop.hive.ql.optimizer.metainfo.annotation.OpTraitsRulesProcFactory;
 import org.apache.hadoop.hive.ql.parse.ParseContext;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /*
  * This class annotates each operator with its traits. The OpTraits class
  * specifies the traits that are populated for each operator.
  */
 public class AnnotateWithOpTraits extends Transform {
+    private static final Logger LOG = LoggerFactory.getLogger(AnnotateWithOpTraits.class.getName());
 
   @Override
   public ParseContext transform(ParseContext pctx) throws SemanticException {
-    AnnotateOpTraitsProcCtx annotateCtx = new AnnotateOpTraitsProcCtx(pctx);
+      AnnotateOpTraitsProcCtx annotateCtx = new AnnotateOpTraitsProcCtx(pctx);
 
     // create a walker which walks the tree in a BFS manner while maintaining the
     // operator stack. The dispatcher generates the plan from the operator tree
@@ -85,6 +89,9 @@ public class AnnotateWithOpTraits extends Transform {
         annotateCtx);
     GraphWalker ogw = new LevelOrderWalker(disp, 0);
 
+      for(HashMap.Entry<String, TableScanOperator> entry : pctx.getTopOps().entrySet()) {
+          LOG.debug("Annotate key = {}, value={}" , entry.getKey(), entry.getValue().dump(0) );
+      }
     // Create a list of topop nodes
     ArrayList<Node> topNodes = new ArrayList<Node>();
     topNodes.addAll(pctx.getTopOps().values());
